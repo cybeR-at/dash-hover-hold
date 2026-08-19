@@ -59,6 +59,19 @@ export default class DashHoverHoldExtension extends Extension {
             return GLib.SOURCE_REMOVE;
         }
 
+        let dash = Main.overview.dash;
+        let showAppsBtn = dash ? (dash.showAppsButton || dash._showAppsIcon) : null;
+
+        // APP GRID EXCEPTION (Second Overview)
+        // If the "Show Applications" button is "checked" (App Grid is open),
+        // we pause the hover-to-close logic.
+        if (showAppsBtn && showAppsBtn.checked) {
+            // Reset the variable to prevent accidentally closing the overview 
+            // when the user closes the App Grid and the mouse is outside the Dash.
+            this._wasInDash = false; 
+            return GLib.SOURCE_CONTINUE; 
+        }
+
         // Evaluate whether the mouse is in the Dash OR if a context menu is open
         let inDashOrMenu = this._isPointerInDashOrMenuOpen();
 
@@ -92,16 +105,14 @@ export default class DashHoverHoldExtension extends Extension {
         }
 
         // 2. GNOME Global Menu Manager Check
-        // If a popup menu (right-click) is active, keep the overview open
         if (Main.popupMenuManager && Main.popupMenuManager.activeMenu) {
             return true;
         }
 
-        // 3. Deep check on Dash icons (Fallbacks for different GNOME versions)
+        // 3. Deep check on Dash icons
         if (dash && dash._box) {
             let items = dash._box.get_children();
             for (let item of items) {
-                // Attempt to get the icon, bypassing invisible container layers
                 let icon = item.child || (item.get_first_child ? item.get_first_child() : item);
                 if (icon) {
                     let menu = icon.menu || icon._menu || icon.popupMenu;
@@ -110,9 +121,10 @@ export default class DashHoverHoldExtension extends Extension {
             }
         }
 
-        // 4. Check the Show Apps button
-        if (dash && dash._showAppsIcon) {
-            let menu = dash._showAppsIcon.menu || dash._showAppsIcon._menu || dash._showAppsIcon.popupMenu;
+        // 4. Check the Show Apps button menu
+        let showAppsBtn = dash ? (dash.showAppsButton || dash._showAppsIcon) : null;
+        if (showAppsBtn) {
+            let menu = showAppsBtn.menu || showAppsBtn._menu || showAppsBtn.popupMenu;
             if (menu && menu.isOpen) return true;
         }
 
