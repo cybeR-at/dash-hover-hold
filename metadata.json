@@ -1,6 +1,6 @@
 {
   "name": "Dash Hover Hold",
-  "version": 1.1,
+  "version": 1.2,
   "description": "Prevents the Dash and Overview from closing automatically when clicking on an application. Useful for opening up multiple applications at once while preserving the native Gnome Dash.",
   "uuid": "dash-hover-hold@cyber-at.github.com",
   "shell-version": [

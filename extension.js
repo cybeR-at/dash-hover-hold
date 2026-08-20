@@ -61,6 +61,7 @@ export default class DashHoverHoldExtension extends Extension {
 
         let dash = Main.overview.dash;
         let showAppsBtn = dash ? (dash.showAppsButton || dash._showAppsIcon) : null;
+        let searchEntry = Main.overview.searchEntry;
 
         // APP GRID EXCEPTION (Second Overview)
         // If the "Show Applications" button is "checked" (App Grid is open),
@@ -70,6 +71,14 @@ export default class DashHoverHoldExtension extends Extension {
             // when the user closes the App Grid and the mouse is outside the Dash.
             this._wasInDash = false; 
             return GLib.SOURCE_CONTINUE; 
+        }
+
+        // SEARCH EXCEPTION
+        // If there is text in the search entry, the user is looking at search results.
+        // We pause the hover-to-close logic so they can move the mouse up to click them.
+        if (searchEntry && searchEntry.get_text() !== '') {
+            this._wasInDash = false;
+            return GLib.SOURCE_CONTINUE;
         }
 
         // Evaluate whether the mouse is in the Dash OR if a context menu is open
