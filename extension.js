@@ -67,8 +67,6 @@ export default class DashHoverHoldExtension extends Extension {
         // If the "Show Applications" button is "checked" (App Grid is open),
         // we pause the hover-to-close logic.
         if (showAppsBtn && showAppsBtn.checked) {
-            // Reset the variable to prevent accidentally closing the overview 
-            // when the user closes the App Grid and the mouse is outside the Dash.
             this._wasInDash = false; 
             return GLib.SOURCE_CONTINUE; 
         }
@@ -79,6 +77,24 @@ export default class DashHoverHoldExtension extends Extension {
         if (searchEntry && searchEntry.get_text() !== '') {
             this._wasInDash = false;
             return GLib.SOURCE_CONTINUE;
+        }
+
+        // MINIMIZED WINDOW EXCEPTION
+        // If there is any minimized window in the current workspace,
+        // we pause the hover-to-close logic so the user can interact with it in the overview.
+        let workspaceManager = global.workspace_manager;
+        if (workspaceManager) {
+            let activeWorkspace = workspaceManager.get_active_workspace();
+            if (activeWorkspace) {
+                let windows = activeWorkspace.list_windows();
+                // Check if any window is minimized and is a normal app window (not a background process)
+                let hasMinimized = windows.some(w => w.minimized && !w.is_skip_taskbar());
+                
+                if (hasMinimized) {
+                    this._wasInDash = false;
+                    return GLib.SOURCE_CONTINUE;
+                }
+            }
         }
 
         // Evaluate whether the mouse is in the Dash OR if a context menu is open
