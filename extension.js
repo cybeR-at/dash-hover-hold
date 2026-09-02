@@ -63,34 +63,56 @@ export default class DashHoverHoldExtension extends Extension {
         let showAppsBtn = dash ? (dash.showAppsButton || dash._showAppsIcon) : null;
         let searchEntry = Main.overview.searchEntry;
 
-        // APP GRID EXCEPTION (Second Overview)
-        // If the "Show Applications" button is "checked" (App Grid is open),
-        // we pause the hover-to-close logic.
+        // APP GRID EXCEPTION
         if (showAppsBtn && showAppsBtn.checked) {
             this._wasInDash = false; 
             return GLib.SOURCE_CONTINUE; 
         }
 
         // SEARCH EXCEPTION
-        // If there is text in the search entry, the user is looking at search results.
-        // We pause the hover-to-close logic so they can move the mouse up to click them.
         if (searchEntry && searchEntry.get_text() !== '') {
             this._wasInDash = false;
             return GLib.SOURCE_CONTINUE;
         }
 
-        // MINIMIZED WINDOW EXCEPTION
-        // If there is any minimized window in the current workspace,
-        // we pause the hover-to-close logic so the user can interact with it in the overview.
+        // MINIMIZED & GEOMETRICALLY OBSCURED WINDOW EXCEPTION
         let workspaceManager = global.workspace_manager;
         if (workspaceManager) {
             let activeWorkspace = workspaceManager.get_active_workspace();
             if (activeWorkspace) {
-                let windows = activeWorkspace.list_windows();
-                // Check if any window is minimized and is a normal app window (not a background process)
-                let hasMinimized = windows.some(w => w.minimized && !w.is_skip_taskbar());
+                let unsortedWindows = activeWorkspace.list_windows().filter(w => !w.is_skip_taskbar());
                 
-                if (hasMinimized) {
+                // 1. Check for minimized windows
+                let hasMinimized = unsortedWindows.some(w => w.minimized);
+                let isFullyObscured = false;
+                
+                // 2. Check for geometrically obscured windows using Z-Order
+                if (!hasMinimized && unsortedWindows.length > 1) {
+                    // Sort windows by stacking order (from bottom/background to top/foreground)
+                    let windows = global.display.sort_windows_by_stacking(unsortedWindows);
+                    
+                    for (let i = 0; i < windows.length; i++) {
+                        let rectBelow = windows[i].get_frame_rect();
+                        
+                        // Compare ONLY with windows stacked ABOVE the current one (j > i)
+                        for (let j = i + 1; j < windows.length; j++) {
+                            let rectAbove = windows[j].get_frame_rect();
+                            
+                            // Check if the window ABOVE completely encloses the window BELOW
+                            if (rectAbove.x <= rectBelow.x &&
+                                rectAbove.y <= rectBelow.y &&
+                                (rectAbove.x + rectAbove.width) >= (rectBelow.x + rectBelow.width) &&
+                                (rectAbove.y + rectAbove.height) >= (rectBelow.y + rectBelow.height)) {
+                                
+                                isFullyObscured = true;
+                                break;
+                            }
+                        }
+                        if (isFullyObscured) break;
+                    }
+                }
+
+                if (hasMinimized || isFullyObscured) {
                     this._wasInDash = false;
                     return GLib.SOURCE_CONTINUE;
                 }
@@ -113,7 +135,6 @@ export default class DashHoverHoldExtension extends Extension {
     }
 
     _isPointerInDashOrMenuOpen() {
-        // 1. Geometric Check (Dash Area)
         let dash = Main.overview.dash;
         if (dash) {
             let [pointerX, pointerY] = global.get_pointer();
@@ -129,12 +150,10 @@ export default class DashHoverHoldExtension extends Extension {
             }
         }
 
-        // 2. GNOME Global Menu Manager Check
         if (Main.popupMenuManager && Main.popupMenuManager.activeMenu) {
             return true;
         }
 
-        // 3. Deep check on Dash icons
         if (dash && dash._box) {
             let items = dash._box.get_children();
             for (let item of items) {
@@ -146,7 +165,6 @@ export default class DashHoverHoldExtension extends Extension {
             }
         }
 
-        // 4. Check the Show Apps button menu
         let showAppsBtn = dash ? (dash.showAppsButton || dash._showAppsIcon) : null;
         if (showAppsBtn) {
             let menu = showAppsBtn.menu || showAppsBtn._menu || showAppsBtn.popupMenu;
